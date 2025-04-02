@@ -17,7 +17,20 @@ def generate_documentation(repo_name, repo_analysis, anthropic_client):
             model="claude-3-sonnet-20240229",
             max_tokens=4000,
             temperature=0,
-            system="You are a technical documentation expert. Analyze the repository files and create comprehensive documentation including getting started guide, data elements, flow charts, architecture overview, and FAQs.",
+            system="""You are a technical documentation expert. Your task is to analyze repository files and create comprehensive documentation. Follow these guidelines:
+
+1. Be specific and detailed in your explanations
+2. Use real code examples from the repository
+3. Create proper Mermaid diagrams that accurately represent the system
+4. Focus on practical, actionable information
+5. Include security and performance best practices
+6. Write in a clear, professional style
+7. Structure documentation with proper headings and sections
+8. Include code snippets and configuration examples
+9. Add troubleshooting guides and common issues
+10. Ensure all documentation is accurate based on the code
+
+Format your response as a complete Markdown document with all sections properly formatted.""",
             messages=[
                 {"role": "user", "content": prompt}
             ]
@@ -33,89 +46,150 @@ def generate_documentation(repo_name, repo_analysis, anthropic_client):
 
 def create_documentation_prompt(repo_name, repo_analysis):
     """Create prompt for Claude to generate documentation."""
-    readme_content = repo_analysis.get("readme", {}).get("content", "No README found")
-    
-    # Get some key files to include in the prompt
-    important_file_types = [".py", ".js", ".ts", ".java", ".go", ".rb", ".php", ".cs"]
-    important_files = []
-    
-    # Find important files (limit to 10 to avoid token limits)
-    for file in repo_analysis["files"]:
-        if any(file["path"].endswith(ext) for ext in important_file_types):
-            important_files.append(file)
-            if len(important_files) >= 10:
-                break
+    # Get project structure information
+    project_structure = repo_analysis.get("project_structure", {})
+    main_readme = repo_analysis.get("main_readme", {}).get("content", "No README found")
+    source_files = repo_analysis.get("source_files", [])
+    config_files = repo_analysis.get("config_files", [])
     
     # Create the prompt
     prompt = f"""
-# Repository Analysis Task: {repo_name}
+# Repository Documentation Task: {repo_name}
 
-Your task is to create comprehensive documentation for this repository. Based on the files I'll show you, please create separate documentation sections:
+## Project Overview
 
-1. Getting Started Guide
-2. Data Models Documentation
-3. Flow Charts (using Mermaid syntax)
-4. Architecture Overview
-5. FAQs
+Repository Name: {repo_name}
+Main Technology: {project_structure.get("main_tech", "unknown")}
+Total Files: {project_structure.get("total_files", 0)}
+Source Files: {project_structure.get("source_files", 0)}
+Configuration Files: {project_structure.get("config_files", 0)}
+Has Docker: {"Yes" if project_structure.get("has_docker") else "No"}
+Has Tests: {"Yes" if project_structure.get("has_tests") else "No"}
+Has Existing Docs: {"Yes" if project_structure.get("has_docs") else "No"}
 
-## Repository Overview
+## Current README Content
 
-The repository name is: {repo_name}
-Total number of files: {repo_analysis["total_files"]}
+{main_readme}
 
-## README Content
+## Repository Structure
 
-{readme_content}
+### Source Files:
+{chr(10).join(f"- {file['path']}" for file in source_files)}
 
-## Key Files in the Repository
+### Config Files:
+{chr(10).join(f"- {file['path']}" for file in config_files)}
+
+## Key Source Files Content
 
 """
 
-    # Add key files
-    for file in important_files:
-        prompt += f"\n### File: {file['path']}\n"
-        prompt += "```\n"
-        # Limit content to avoid exceeding token limits
-        prompt += file["content"][:5000] + ("..." if len(file["content"]) > 5000 else "")
+    # Add important source files
+    for file in source_files:
+        if any(pattern in file["path"].lower() for pattern in [
+            "main", "index", "app", "server", "config", "model", "type", "interface", "service"
+        ]):
+            prompt += f"\n### {file['path']}\n```\n"
+            prompt += file["content"][:3000] + ("..." if len(file["content"]) > 3000 else "")
+            prompt += "\n```\n"
+    
+    # Add configuration files
+    prompt += "\n## Configuration Files\n"
+    for file in config_files:
+        prompt += f"\n### {file['path']}\n```\n"
+        prompt += file["content"][:1500] + ("..." if len(file["content"]) > 1500 else "")
         prompt += "\n```\n"
     
     prompt += """
-## Documentation Deliverables
+## Required Documentation Sections
 
-Please create the following documentation sections in separate Markdown files:
+Please create comprehensive documentation with the following sections. Each section should be detailed and include real examples from the code:
 
-1. **Getting Started Guide** (getting-started/README.md)
-   - Prerequisites
-   - Installation steps
-   - Basic usage examples
-   - Configuration options
+1. ## Getting Started Guide
 
-2. **Data Models Documentation** (data-models/README.md)
-   - Key data structures/models
-   - Database schema (if applicable)
-   - API endpoints (if applicable)
-   - Data flow diagrams
+Create a practical guide that includes:
+- Prerequisites and system requirements (based on package.json, requirements.txt, etc.)
+- Step-by-step installation instructions
+- Configuration setup with real examples
+- Environment variables setup
+- Basic usage examples using real code from the repository
+- Development setup instructions
+- Common issues and solutions
 
-3. **Flow Charts** (flows/README.md)
-   - Application workflow diagrams
-   - Data flow diagrams
-   - Process flow diagrams
-   - Use Mermaid syntax for all diagrams
+2. ## Data Models Documentation
 
-4. **Architecture Overview** (architecture/README.md)
-   - System architecture
-   - Key components/modules
-   - Design patterns used
-   - Important functions/classes
-   - Integration points
+Document all data structures including:
+- Database schemas and models
+- TypeScript/JavaScript interfaces and types
+- API request/response models
+- Data validation rules
+- Example data structures
+- Entity relationships (with Mermaid ER diagrams)
+- Data flow between components
 
-5. **FAQs** (faqs/README.md)
-   - Common questions and answers
-   - Troubleshooting guide
-   - Best practices
-   - Known issues and workarounds
+3. ## Flow Charts
 
-Please format each section as a separate Markdown file with clear headings and proper formatting.
+Create detailed diagrams using Mermaid syntax for:
+- Application workflow
+- Request/response flow
+- Data processing pipelines
+- State management
+- Component interactions
+- Authentication/authorization flow
+- Error handling flow
+
+Example Mermaid diagram:
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant Database
+    Client->>API: Request
+    API->>Database: Query
+    Database-->>API: Response
+    API-->>Client: Result
+```
+
+4. ## Architecture Overview
+
+Provide a comprehensive overview including:
+- System architecture (with Mermaid diagram)
+- Component breakdown
+- Design patterns used
+- Security measures
+- Performance optimizations
+- Integration points
+- Deployment architecture
+- Scalability considerations
+- Error handling strategy
+
+5. ## FAQs
+
+Create a practical FAQ section covering:
+- Common development questions
+- Troubleshooting guide
+- Best practices
+- Performance tips
+- Security guidelines
+- Known issues and workarounds
+- Deployment considerations
+- Maintenance procedures
+
+Format your response as a complete Markdown document. Use proper headings, code blocks, and Mermaid diagrams. Focus on practical, actionable information that will help developers understand and work with the codebase.
+
+## Important Notes
+
+1. Use actual code examples from the repository
+2. Create accurate Mermaid diagrams based on the code structure
+3. Include security and performance considerations
+4. Add troubleshooting guides for common issues
+5. Make the documentation practical and actionable
+6. Structure the content with clear headings
+7. Include configuration examples
+8. Add code snippets for common tasks
+9. Reference actual file paths and components
+10. Explain architectural decisions and trade-offs
+
+Begin your response with the Getting Started Guide section.
 """
     
     return prompt 

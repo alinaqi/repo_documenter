@@ -307,4 +307,136 @@ Stars: {repo_data['stargazerCount']} | Forks: {repo_data['forkCount']}
             
         except Exception as e:
             logger.error(f"Error processing organization: {e}")
+            return False
+
+    def clone_and_setup_repos(self, github_org_url, skip_documentation=True):
+        """
+        Clone repositories and create documentation structure without generating documentation.
+        
+        Args:
+            github_org_url (str): URL of the GitHub organization
+            skip_documentation (bool): Whether to skip documentation generation (default: True)
+        """
+        try:
+            # Extract organization name
+            org_name = extract_org_name(github_org_url)
+            logger.info(f"Processing organization: {org_name}")
+            
+            try:
+                # Try using the GitHub API
+                repositories = get_repositories(self.github_client, org_name)
+                total_repos = len(repositories)
+                logger.info(f"Found {total_repos} repositories using GitHub API")
+                
+                # Process each repository
+                for idx, repo in enumerate(repositories, 1):
+                    print(f"\n{'='*80}")
+                    print(f"Repository {idx}/{total_repos}: {repo.name}")
+                    print(f"{'='*80}")
+                    
+                    # Show repository summary
+                    summary = get_repository_summary(repo)
+                    print(summary)
+                    
+                    # Ask for confirmation
+                    while True:
+                        response = input("\nDo you want to clone this repository? (y/n): ").lower()
+                        if response in ['y', 'n']:
+                            break
+                        print("Please enter 'y' or 'n'")
+                    
+                    if response == 'n':
+                        print(f"Skipping repository {repo.name}")
+                        continue
+                    
+                    repo_dir = self.output_dir / repo.name
+                    
+                    # Clone repository
+                    print(f"\nCloning repository {repo.name}...")
+                    if clone_repository(repo, str(repo_dir), self.github_token, self.use_gh_cli):
+                        # Create documentation structure
+                        print(f"Creating documentation structure for {repo.name}...")
+                        create_documentation_structure(str(repo_dir))
+                        print(f"Repository cloned and documentation structure created for {repo.name}")
+                    else:
+                        print(f"Failed to clone repository {repo.name}")
+                    
+                    # Add small delay to avoid rate limits
+                    time.sleep(1)
+                
+            except GithubException as api_error:
+                # If GitHub API fails due to SAML enforcement or other issues
+                logger.warning(f"GitHub API error: {api_error}")
+                
+                if self.use_gh_cli:
+                    logger.info("Using GitHub CLI to list repositories")
+                    
+                    # Use GitHub CLI to list repositories
+                    try:
+                        process = subprocess.run(
+                            ['gh', 'repo', 'list', org_name, '--limit', '100', '--json', 'name,description,updatedAt,stargazerCount,forkCount', '--jq', '.[]'],
+                            capture_output=True,
+                            text=True
+                        )
+                        
+                        if process.returncode == 0:
+                            repos_data = json.loads(process.stdout)
+                            total_repos = len(repos_data)
+                            
+                            for idx, repo_data in enumerate(repos_data, 1):
+                                print(f"\n{'='*80}")
+                                print(f"Repository {idx}/{total_repos}: {repo_data['name']}")
+                                print(f"{'='*80}")
+                                
+                                # Show repository summary
+                                summary = f"""
+Repository: {repo_data['name']}
+Description: {repo_data.get('description', 'No description available')}
+Last Updated: {repo_data['updatedAt']}
+Stars: {repo_data['stargazerCount']} | Forks: {repo_data['forkCount']}
+"""
+                                print(summary)
+                                
+                                # Ask for confirmation
+                                while True:
+                                    response = input("\nDo you want to clone this repository? (y/n): ").lower()
+                                    if response in ['y', 'n']:
+                                        break
+                                    print("Please enter 'y' or 'n'")
+                                
+                                if response == 'n':
+                                    print(f"Skipping repository {repo_data['name']}")
+                                    continue
+                                
+                                repo_dir = self.output_dir / repo_data['name']
+                                repo_full_name = f"{org_name}/{repo_data['name']}"
+                                
+                                # Clone using GitHub CLI
+                                print(f"\nCloning repository {repo_data['name']}...")
+                                if self.clone_repository_cli(repo_full_name, str(repo_dir)):
+                                    # Create documentation structure
+                                    print(f"Creating documentation structure for {repo_data['name']}...")
+                                    create_documentation_structure(str(repo_dir))
+                                    print(f"Repository cloned and documentation structure created for {repo_data['name']}")
+                                else:
+                                    print(f"Failed to clone repository {repo_data['name']}")
+                                
+                                # Add small delay to avoid rate limits
+                                time.sleep(1)
+                        else:
+                            logger.error(f"Error listing repositories with GitHub CLI: {process.stderr}")
+                            self.manual_repository_input(org_name)
+                            
+                    except subprocess.CalledProcessError as e:
+                        logger.error(f"GitHub CLI error: {e}")
+                        self.manual_repository_input(org_name)
+                else:
+                    # If GitHub CLI is not available, prompt for manual input
+                    self.manual_repository_input(org_name)
+            
+            logger.info(f"Completed processing organization: {org_name}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error processing organization: {e}")
             return False 

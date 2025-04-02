@@ -1,5 +1,5 @@
-# Environment variables
-.env
+# Cloned repositories
+repositories/
 
 # Python
 __pycache__/
@@ -23,22 +23,63 @@ wheels/
 .installed.cfg
 *.egg
 
-# Logs
-*.log
-repo_documenter.log
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
 
-# Repository clones directory
-repositories/
+# Environment variables
+.env
+.env.local
+.env.*.local
 
-# Virtual environments
-venv/
-env/
-ENV/
-.venv/
-
-# IDE files
+# IDE
 .idea/
 .vscode/
 *.swp
 *.swo
 .DS_Store
+
+# Logs
+logs/
+*.log
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# Distribution
+dist/
+build/
+
+# Misc
+.DS_Store
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
+*.der
+*.p7b
+*.p7c
+*.p7m
+*.p7s
+*.cer
+*.crl
+*.crt
+*.der
+*.pem
+*.p7b
+*.p7c
+*.p7m
+*.p7s
+*.cer
+*.crl
+
+repo_documenter.log
+repo_documenter/
