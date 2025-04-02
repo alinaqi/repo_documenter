@@ -18,6 +18,7 @@ A Python tool that automatically clones GitHub repositories from an organization
 - Python 3.7+
 - GitHub Personal Access Token
 - Anthropic API Key
+- GitHub CLI (recommended for SAML-protected organizations)
 
 ## Installation
 
@@ -101,6 +102,27 @@ You can modify these parameters in the script:
 - **Rate Limiting**: Both GitHub API and Anthropic API have rate limits
 - **Repository Size**: Very large repositories may be partially analyzed due to token limits
 - **File Types**: The script prioritizes common code files (.py, .js, .ts, etc.)
+
+## Handling SAML-Protected Organizations
+
+For organizations using SAML SSO (Single Sign-On), we recommend using GitHub CLI:
+
+1. **Install GitHub CLI**:
+   - Follow instructions at [cli.github.com](https://cli.github.com/)
+   - The script will automatically detect and use GitHub CLI if available
+
+2. **Authenticate with GitHub CLI**:
+   ```bash
+   gh auth login
+   ```
+   - Follow the prompts to authenticate
+   - For SAML organizations, you'll be prompted to authorize the CLI
+
+3. **Running with GitHub CLI**:
+   - The script will automatically use GitHub CLI when available
+   - GitHub CLI handles SAML authentication seamlessly
+
+If GitHub CLI is not available, the script will fall back to standard Git commands and may prompt you for repository names if it encounters authentication issues.
 
 ## License
 
