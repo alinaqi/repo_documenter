@@ -1,0 +1,6 @@
+PyGithub
+anthropic
+requests
+gitpython
+markdown
+python-dotenv
